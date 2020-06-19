@@ -11,7 +11,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 from obspy import UTCDateTime
 from obspy.clients.fdsn import Client, header
+from obspy.clients.earthworm import Client as WClient
 from obspy.geodetics.base import gps2dist_azimuth
+from obspy.core import Stream
 
 # And the config file
 import config
@@ -33,7 +35,7 @@ if __name__ == "__main__":
     # Use strftime so we always get a string out of here.
     # Default if no arguments given is current time
     parser.add_argument('T0', nargs='*',
-                        default=[(UTCDateTime.utcnow() - 600).strftime('%Y-%m-%dT%H:%M:00Z'), ])
+                        default=[(UTCDateTime.utcnow()).strftime('%Y-%m-%dT%H:%M:00Z'), ])
 
     args = parser.parse_args()
     if len(args.T0) > 2:
@@ -80,14 +82,30 @@ if __name__ == "__main__":
             # LTS alpha parameter - subset size
             ALPHA = array['Alpha']
 
-            print('Reading in data from IRIS')
-            client = Client("IRIS")
+            print(f'Reading in data from Winston for station {STA}')
+            wclient = WClient(config.winston_address, config.winston_port)
+            # Get Availability
             try:
-                st = client.get_waveforms(NET, STA, LOC, CHAN,
-                                          STARTTIME - 2 * config.taper_val,
-                                          ENDTIME + 2 * config.taper_val,
-                                          attach_response=True)
-            except header.FDSNNoDataException:
+                avail = wclient.get_availability(NET, STA, channel = CHAN)
+            except Exception:
+                print(f"Unable to get location info for station {STA}")
+                continue
+
+            locs = [x[2] for x in avail]
+            st = Stream()
+            for loc in locs:
+                try:
+                    # Not sure why we can't use a wildcard for loc, but it
+                    # doesn't seem to work (at least, not for DLL), so we loop.
+                    tr = wclient.get_waveforms(NET, STA, loc, CHAN,
+                                               STARTTIME - 2 * config.taper_val,
+                                               ENDTIME + 2 * config.taper_val,
+                                               cleanup=True)
+                    st += tr
+                except Exception:
+                    continue
+
+            if not st:
                 print(f"No data retrieved for {STA}")
                 continue
 
@@ -96,8 +114,8 @@ if __name__ == "__main__":
             st.sort()
             print(st)
 
-            print('Removing sensitivity...')
-            st.remove_sensitivity()
+            # print('Removing sensitivity...')
+            # st.remove_sensitivity()
 
             stf = st.copy()
             stf.detrend('demean')
@@ -106,9 +124,14 @@ if __name__ == "__main__":
             st.trim(STARTTIME, ENDTIME, pad='true', fill_value=0)
 
             # %% Get inventory and lat/lon info
-            inv = client.get_stations(network=NET, station=STA, channel=CHAN,
-                                      location=LOC, starttime=STARTTIME,
-                                      endtime=ENDTIME, level='channel')
+            client = Client("IRIS")
+            try:
+                inv = client.get_stations(network=NET, station=STA, channel=CHAN,
+                                          location=LOC, starttime=STARTTIME,
+                                          endtime=ENDTIME, level='channel')
+            except header.FDSNNoDataException:
+                print(f"No lat/lon info retrieved for {STA}")
+                continue
 
             latlist = []
             lonlist = []

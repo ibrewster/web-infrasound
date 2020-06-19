@@ -1,11 +1,12 @@
 out_web_dir = '/www/avosouth.wr.usgs.gov/htdocs/infrasound'
 out_web_dir = '/tmp/infrasound'
+winston_address = 'pubavo1.wr.usgs.gov'
+winston_port = 16022
+
 #######
 # TODO: Determine if we need these
 out_valve_dir = '/lamp/valve3/seismic/infrasound/raw'
 working_dir = '/usr/local/ipensive'
-winston_address = 'hvo-wws.wr.usgs.gov'
-winston_port = 16022
 ##########
 
 duration = 600  # DON'T CHANGE THIS!
