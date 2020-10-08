@@ -1,5 +1,6 @@
 # %% module imports
 import argparse
+import logging
 import os
 import warnings
 
@@ -17,6 +18,10 @@ from obspy.core import Stream
 
 # And the config file
 import config
+
+# set up logging
+logging.basicConfig("/var/log/array_processing.log")
+logging.getLogger().setLevel(logging.INFO)
 
 
 def get_volcano_backazimuth(latlist, lonlist, volcanoes):
@@ -82,13 +87,13 @@ if __name__ == "__main__":
             # LTS alpha parameter - subset size
             ALPHA = array['Alpha']
 
-            print(f'Reading in data from Winston for station {STA}')
+            logging.info(f'Reading in data from Winston for station {STA}')
             wclient = WClient(config.winston_address, config.winston_port)
             # Get Availability
             try:
                 avail = wclient.get_availability(NET, STA, channel = CHAN)
             except Exception:
-                print(f"Unable to get location info for station {STA}")
+                logging.error(f"Unable to get location info for station {STA}")
                 continue
 
             locs = [x[2] for x in avail]
@@ -106,13 +111,13 @@ if __name__ == "__main__":
                     continue
 
             if not st:
-                print(f"No data retrieved for {STA}")
+                logging.error(f"No data retrieved for {STA}")
                 continue
 
             st.merge(fill_value='latest')
             st.trim(STARTTIME - 2 * config.taper_val, ENDTIME + 2 * config.taper_val, pad='true', fill_value=0)
             st.sort()
-            print(st)
+            logging.info(st)
 
             # print('Removing sensitivity...')
             # st.remove_sensitivity()
@@ -130,7 +135,7 @@ if __name__ == "__main__":
                                           location=LOC, starttime=STARTTIME,
                                           endtime=ENDTIME, level='channel')
             except header.FDSNNoDataException:
-                print(f"No lat/lon info retrieved for {STA}")
+                logging.error(f"No lat/lon info retrieved for {STA}")
                 continue
 
             latlist = []
@@ -150,14 +155,14 @@ if __name__ == "__main__":
             try:
                 lts_vel, lts_baz, t, mdccm, stdict, sigma_tau = lts_array.ltsva(stf, rij, WINLEN, WINOVER, ALPHA)
             except:
-                print("Error processing data. Moving on.")
+                logging.error("Error processing data. Moving on.")
                 continue
 
             # %% Plotting
             try:
                 fig, axs = lts_array.lts_array_plot(stf, lts_vel, lts_baz, t, mdccm, stdict)
             except UnboundLocalError:
-                print(f"Unable to generate plots for {STA}")
+                logging.error(f"Unable to generate plots for {STA}")
                 continue
 
             # NOTE: these are implementation dependant, and could easily change.
