@@ -20,7 +20,7 @@ from obspy.core import Stream
 import config
 
 # set up logging
-logging.basicConfig("/var/log/array_processing.log")
+logging.basicConfig(filename = "/var/log/array_processing.log")
 logging.getLogger().setLevel(logging.INFO)
 
 
